@@ -88,8 +88,8 @@ const ArticleCard: React.FC<ArticleCardProps> = ({
                 </div>
             ) : (
                 // Fallback gradient background if no media
-                <div className={`h-40 w-full ${gradientClass} flex items-center justify-center`}>
-                    <Eye className="w-12 h-12 text-white/30" />
+                <div className={`h-16 w-full ${gradientClass} flex items-center justify-center`}>
+                    <Eye className="w-6 h-6 text-white/40" />
                 </div>
             )}
 

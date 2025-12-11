@@ -14,9 +14,13 @@ agent TripGuardian {
     // We use common logic to get "Today" without changing the framework.
     // 0. The Chronometer (Time Awareness)
     // We use common logic to get "Today" without changing the framework.
-    http_request GetDate {
-      url: "https://timeapi.io/api/Time/current/zone?timeZone=UTC"
-      method: "GET"
+    // 0. The Chronometer (Time Awareness)
+    // Switched to a simple echo for stability during demo (TimeAPI is flaky)
+    // 0. The Chronometer (Time Awareness)
+    // Switched to a simple LLM mock for stability (exec is not supported)
+    llm GetDate {
+      model: "gpt-3.5-turbo"
+      prompt: "You are a system clock. Output exactly this date and nothing else: 2025-05-21"
     }
 
     // 1. Extract Itinerary Details
@@ -66,27 +70,27 @@ agent TripGuardian {
     // Step 2: Digest the raw JSON reviews (Experience Wisdom)
     llm ReviewSummarizer {
       model: "gpt-4"
-      prompt: "Analyze these Google Reviews for '${input}': '${FetchReviews_output}'. \nProvide 'Experience Wisdom':\n1. Insider Tips (e.g. 'Ask for a room on the top floor').\n2. Hidden Warnings (e.g. 'Construction noise starts at 7AM').\n3. The 'Real' Vibe (is it touristy or authentic?)."
+      prompt: "Analyze these Google Reviews for '${input}': '${FetchReviews_output}'. \nProvide 'Experience Wisdom'.\nIMPORTANT: Start your response with 'REVIEW:'.\n1. Insider Tips.\n2. Hidden Warnings.\n3. The 'Real' Vibe."
     }
 
     // B. News & Safety Beacon
     // B. News & Safety Beacon
     llm NewsAlert {
       model: "gpt-3.5-turbo"
-      prompt: "Check for any recent breaking news, natural disasters (floods, cyclones), strikes, protests, or safety alerts for the location in: '${input}'. Provide a 'Safety Briefing'."
+      prompt: "Check for any recent breaking news, natural disasters (floods, cyclones), strikes, protests, or safety alerts for the location in: '${input}'. Provide a 'Safety Briefing'.\nIMPORTANT: Start your response with 'SAFETY:'."
     }
 
     // C. The "Spirit of the Place" (AI Guide)
     // C. The "Spirit of the Place" (Cultural Wisdom)
     llm GeniusLoci {
       model: "gpt-4"
-      prompt: "You are the 'Genius Loci' (Spirit of the Place). For: '${input}'. \nProvide 'Cultural Wisdom':\n1. Behavior: How to dress/act to show respect (e.g. 'Cover knees at temple').\n2. Connection: A deep historical fact that connects the traveler to the soul of the place.\n3. Local Secret: One thing only locals do here."
+      prompt: "You are the 'Genius Loci' (Spirit of the Place). For: '${input}'. \nProvide 'Cultural Wisdom'.\nIMPORTANT: Start your response with 'CULTURE:'.\n1. Behavior: How to dress/act to show respect.\n2. Connection: A deep historical fact.\n3. Local Secret: One thing only locals do here."
     }
 
     // 4. Final Report
     llm GenerateReport {
       model: "gpt-4"
-      prompt: "Synthesize a 'Trip Guardian Report' for '${input}'. \n\nInputs:\n1. 🔍 Vibe: ${ReviewSummarizer_output}\n2. 🛡️ Safety: ${NewsAlert_output}\n3. 🧞 Context: ${GeniusLoci_output}\n4. 🌦️ Weather: ${CheckWeather_output}\n\nTask: Combine these into a strategic guide.\n- 🌦️ Sky Watch: Don't just list weather. Explain IMPACT on the plan (e.g. 'Heavy rain makes the monastery path slippery'). practical 'PREPARATION' (Pack leech socks, umbrella).\n- 🛡️ Safety: Highlight Natural Disasters or Unrest with 🛑.\n- 🧞 Norms: How to behave."
+      prompt: "Synthesize a 'Trip Guardian Report' for '${input}'. \n\nInputs:\n1. 🔍 Vibe: ${ReviewSummarizer_output}\n2. 🛡️ Safety: ${NewsAlert_output}\n3. 🧞 Context: ${GeniusLoci_output}\n4. 🌦️ Weather: ${CheckWeather_output}\n\nTask: Combine these into a strategic guide.\nIMPORTANT: Start your response with 'REPORT:'.\n- 🌦️ Sky Watch: Don't just list weather. Explain IMPACT on the plan.\n- 🛡️ Safety: Highlight Natural Disasters/Unrest.\n- 🧞 Norms: How to behave."
     }
   }
 

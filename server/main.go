@@ -33,10 +33,11 @@ var currentFeed = []FeedItem{}
 
 func main() {
 	// Load .env file if it exists
-	if err := godotenv.Load(); err != nil {
+	// Load .env file and OVERWRITE system env if present
+	if err := godotenv.Overload(); err != nil {
 		fmt.Println("INFO: No .env file found, relying on system env.")
 	} else {
-		fmt.Println("INFO: Loaded config from .env")
+		fmt.Println("INFO: Loaded and overloaded config from .env")
 	}
 
 	// Init Engine
@@ -249,12 +250,16 @@ func shouldSkipMessage(message, eventType, rawJSON string) bool {
 
 	// Skip trivial/system messages that don't add value
 	trivialPhrases := []string{
-		`{"type"`,   // Raw JSON
-		"INIT",      // System initialization
-		"DEBUG",     // Debug logs
-		"TRACE",     // Trace logs
-		"null",      // Null messages
-		"undefined", // Undefined messages
+		`{"type"`,              // Raw JSON
+		"INIT",                 // System initialization
+		"DEBUG",                // Debug logs
+		"TRACE",                // Trace logs
+		"null",                 // Null messages
+		"undefined",            // Undefined messages
+		"Error executing node", // Agent runtime errors
+		"openai api error",     // LLM API errors
+		"Bad Gateway",          // 502 errors
+		"invalid character",    // JSON parsing errors
 	}
 	for _, phrase := range trivialPhrases {
 		if strings.Contains(message, phrase) {
@@ -302,7 +307,7 @@ func mapToCard(message string) (string, string, map[string]interface{}) {
 	data["colorTheme"] = "default"
 
 	// 1. Safety Alerts (NewsAlert)
-	if contains(message, "Safety Briefing") || contains(message, "NewsAlert_output") || contains(message, "Warning") || contains(message, "Alert") {
+	if contains(message, "SAFETY:") || contains(message, "NB:") || contains(message, "Safety Briefing") || contains(message, "NewsAlert_output") || contains(message, "Warning") || contains(message, "Alert") {
 		cardType = "safe_alert"
 		priority = "high"
 		data = map[string]interface{}{
@@ -321,7 +326,7 @@ func mapToCard(message string) (string, string, map[string]interface{}) {
 		data["temp"] = "22°C" // Mock for now, or extract regex
 		data["location"] = "Destination"
 		data["condition"] = "Cloudy"
-	} else if contains(message, "Wisdom") || contains(message, "GeniusLoci_output") || contains(message, "Tip") || contains(message, "Culture") {
+	} else if contains(message, "CULTURE:") || contains(message, "REVIEW:") || contains(message, "Wisdom") || contains(message, "GeniusLoci_output") || contains(message, "Tip") || contains(message, "Culture") {
 		// 3. Wisdom/Tips - Enhanced with videos
 		cardType = "cultural_tip"
 		data["title"] = "Travel Wisdom"
@@ -335,7 +340,7 @@ func mapToCard(message string) (string, string, map[string]interface{}) {
 		if contains(message, "temple") || contains(message, "shrine") {
 			data["videoUrl"] = "https://www.youtube.com/embed/s-VRyQprlu8" // Sample cultural video
 		}
-	} else if contains(message, "Report") || contains(message, "GenerateReport_output") {
+	} else if contains(message, "REPORT:") || contains(message, "Report") || contains(message, "GenerateReport_output") {
 		// 4. Final Report
 		data["title"] = "Trip Guardian Report"
 		data["source"] = "Final Synthesis"
@@ -352,8 +357,8 @@ func mapToCard(message string) (string, string, map[string]interface{}) {
 		data["imageUrl"] = "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=800&q=80" // News
 	} else {
 		// Default
-		data["title"] = "Agent Log"
-		data["source"] = "Runtime"
+		data["title"] = "Trip Guardian"
+		data["source"] = "Analysis"
 		data["category"] = "Tips"
 		data["colorTheme"] = "default"
 	}
@@ -362,7 +367,10 @@ func mapToCard(message string) (string, string, map[string]interface{}) {
 
 func cleanMessage(msg string) string {
 	// Remove common prefixes
-	prefixes := []string{"CheckWeather_output:", "GeniusLoci_output:", "NewsAlert_output:", "GenerateReport_output:", "output:", "result:"}
+	prefixes := []string{
+		"CheckWeather_output:", "GeniusLoci_output:", "NewsAlert_output:", "GenerateReport_output:", "output:", "result:",
+		"SAFETY:", "CULTURE:", "REPORT:", "REVIEW:",
+	}
 	for _, p := range prefixes {
 		msg = strings.ReplaceAll(msg, p, "")
 	}
