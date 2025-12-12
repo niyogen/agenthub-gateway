@@ -109,9 +109,11 @@ func main() {
 
 		// Initial Run (Reactive)
 		go func() {
-			engine.Run(savePath, "Start Analysis", func(eventJSON string) {
+			if err := engine.Run(savePath, "Start Analysis", func(eventJSON string) {
 				processAndAppendFeed(eventJSON)
-			})
+			}); err != nil {
+				fmt.Printf("Error running initial analysis for %s: %v\n", savePath, err)
+			}
 		}()
 
 		c.JSON(http.StatusOK, gin.H{
@@ -146,7 +148,7 @@ func main() {
 					agentPath = defaultAgent
 				}
 			}
-			
+
 			// Fallback: pick the last uploaded one
 			if agentPath == "" {
 				matches, _ := filepath.Glob("uploaded_*.m")
@@ -193,7 +195,10 @@ func main() {
 	})
 
 	// Start Server
-	r.Run(":8081")
+	// Start Server
+	if err := r.Run(":8081"); err != nil {
+		fmt.Printf("Fatal: Server failed to start: %v\n", err)
+	}
 }
 
 func startScheduledExecution(agentPath string, schedule *runtime.ScheduleInfo) {
@@ -207,9 +212,12 @@ func startScheduledExecution(agentPath string, schedule *runtime.ScheduleInfo) {
 	ticker := time.NewTicker(interval)
 	for range ticker.C {
 		fmt.Println("SCHEDULE: Triggering proactive run...")
-		engine.Run(agentPath, "Proactive Check", func(eventJSON string) {
+		fmt.Println("SCHEDULE: Triggering proactive run...")
+		if err := engine.Run(agentPath, "Proactive Check", func(eventJSON string) {
 			processAndAppendFeed(eventJSON)
-		})
+		}); err != nil {
+			fmt.Printf("Error running scheduled check for %s: %v\n", agentPath, err)
+		}
 	}
 }
 
