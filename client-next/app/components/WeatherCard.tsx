@@ -70,3 +70,4 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ location, temp, condition, de
 export default WeatherCard;
 
 
+

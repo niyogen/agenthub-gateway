@@ -74,3 +74,4 @@ const ComponentFactory = ({ name }: { name: string }) => {
 export default CapabilityLayoutMapper;
 
 
+

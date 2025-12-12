@@ -28,3 +28,4 @@ const SplitLayout: React.FC<SplitLayoutProps> = ({ left, right, className }) => 
 export default SplitLayout;
 
 
+

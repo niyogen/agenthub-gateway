@@ -20,3 +20,4 @@ const SingleColLayout: React.FC<SingleColLayoutProps> = ({ children, className }
 export default SingleColLayout;
 
 
+
