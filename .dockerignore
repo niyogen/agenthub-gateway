@@ -1,6 +1,0 @@
-.git
-.github
-node_modules
-client/node_modules
-client-next/node_modules
-*.log
