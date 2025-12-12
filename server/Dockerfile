@@ -26,8 +26,8 @@ COPY server/.env.example .env
 COPY server/agents/ /app/agents/
 RUN mkdir -p /app/uploads
 
-EXPOSE 8081
+EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD curl -f http://localhost:8081/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD curl -f http://localhost:8080/health || exit 1
 
 CMD ["/app/guardian-gateway"]

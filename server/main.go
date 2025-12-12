@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"guardian-gateway/pkg/fastgraph/runtime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -39,7 +40,7 @@ var currentFeed = []FeedItem{}
 // @title           AiGuardian Gateway API
 // @version         1.0
 // @description     This is the gateway service for the AiGuardian application.
-// @host            localhost:8081
+// @host            localhost:8080
 // @BasePath        /
 
 func main() {
@@ -253,7 +254,12 @@ func main() {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Start Server
-	if err := r.Run(":8081"); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	fmt.Printf("Server starting on port %s...\n", port)
+	if err := r.Run(":" + port); err != nil {
 		fmt.Printf("Fatal: Server failed to start: %v\n", err)
 	}
 }

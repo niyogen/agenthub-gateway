@@ -1,7 +1,9 @@
 {
   "family": "fastgraph-gateway",
   "networkMode": "awsvpc",
-  "requiresCompatibilities": ["FARGATE"],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
   "cpu": "512",
   "memory": "1024",
   "executionRoleArn": "arn:aws:iam::582604091763:role/ecsTaskExecutionRole",
@@ -13,14 +15,14 @@
       "essential": true,
       "portMappings": [
         {
-          "containerPort": 8081,
+          "containerPort": 8080,
           "protocol": "tcp"
         }
       ],
       "environment": [
         {
           "name": "PORT",
-          "value": "8081"
+          "value": "8080"
         },
         {
           "name": "GIN_MODE",
@@ -64,7 +66,7 @@
       "healthCheck": {
         "command": [
           "CMD-SHELL",
-          "curl -f http://localhost:8081/health || exit 1"
+          "curl -f http://localhost:8080/health || exit 1"
         ],
         "interval": 30,
         "timeout": 5,
@@ -74,4 +76,3 @@
     }
   ]
 }
-
