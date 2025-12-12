@@ -242,6 +242,13 @@ func main() {
 		c.SSEvent("done", "true")
 	})
 
+	// Swagger Redirects
+	r.GET("/docs", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+	})
+	r.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+	})
 	// Swagger Handler
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
