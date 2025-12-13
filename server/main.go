@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -38,6 +39,10 @@ var eventCounter int64
 
 // Global Feed - Start empty, only show real agent output
 var currentFeed = []FeedItem{}
+
+// nodeBuckets holds the latest FeedItem for each source node
+var nodeBuckets = map[string]*FeedItem{}
+var bucketMutex sync.Mutex
 
 // @title           AiGuardian Gateway API
 // @version         1.0
@@ -143,22 +148,22 @@ func processAndAppendFeed(eventJSON string) {
 		Message string `json:"message"`
 	}
 
-	message := eventJSON // Default fallback
+	message := eventJSON // fallback
 	if err := json.Unmarshal([]byte(eventJSON), &evt); err == nil {
 		if evt.Message != "" {
 			message = evt.Message
 		}
 	}
 
-	// FILTER OUT USELESS MESSAGES calls
+	// Skip useless messages
 	if shouldSkipMessage(message, evt.Type, eventJSON) {
 		return
 	}
 
-	// Heuristic Mapping for "Nicer" UI
+	// Default UI mapping
 	cardType, priority, data := mapToCard(message)
 
-	// Check if the message is structured (JSON with node info)
+	// Try to extract node information
 	var nodeInfo struct {
 		Node string `json:"node"`
 		Text string `json:"text"`
@@ -166,21 +171,128 @@ func processAndAppendFeed(eventJSON string) {
 	incomingNode := ""
 	cleanText := message
 
-	// Try parsing message as node-structured JSON
 	if err := json.Unmarshal([]byte(message), &nodeInfo); err == nil && nodeInfo.Node != "" {
 		incomingNode = nodeInfo.Node
 		cleanText = nodeInfo.Text
-		// Remap card type based on clean text if needed
 		cardType, priority, data = mapToCard(cleanText)
 		data["source_node"] = incomingNode
 	} else {
-		// Just clean the text if it's raw
 		cleanText = cleanMessage(message)
 		data["summary"] = cleanText
 	}
 
-	// CHUNK AGGREGATION & DEMULTIPLEXING LOGIC
-	// Search in recent items (e.g. last 50) for a card that matches this Node.
+	// ---------- MAP‑BASED BUCKET LOGIC ----------
+	bucketMutex.Lock()
+	defer bucketMutex.Unlock()
+
+	if incomingNode != "" {
+		if existing, ok := nodeBuckets[incomingNode]; ok {
+			// Append to existing bucket
+			lastSummary, _ := existing.Data["summary"].(string)
+			if len(lastSummary) < 10000 {
+				existing.Data["summary"] = lastSummary + cleanText
+				existing.Timestamp = time.Now().Format(time.RFC3339)
+			}
+			return
+		}
+	}
+
+	// No bucket – create a new FeedItem and store it
+	uniqueID := atomic.AddInt64(&eventCounter, 1)
+	if incomingNode != "" && (data["title"] == "Agent Activity" || data["title"] == "Trip Guardian") {
+		data["title"] = incomingNode
+	}
+	newItem := FeedItem{
+		ID:         fmt.Sprintf("evt-%d-%d", time.Now().UnixNano(), uniqueID),
+		CardType:   cardType,
+		Priority:   priority,
+		Timestamp:  time.Now().Format(time.RFC3339),
+		SourceNode: incomingNode,
+		Data:       data,
+	}
+	if incomingNode != "" {
+		nodeBuckets[incomingNode] = &newItem
+	}
+	// Prepend to feed slice (most recent first)
+	currentFeed = append([]FeedItem{newItem}, currentFeed...)
+}
+	fmt.Println("ENGINE EVENT:", eventJSON)
+
+	// Parse the JSON event to extract a clean message
+	var evt struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	}
+
+	message := eventJSON // fallback
+	if err := json.Unmarshal([]byte(eventJSON), &evt); err == nil {
+		if evt.Message != "" {
+			message = evt.Message
+		}
+	}
+
+	// Skip useless messages
+	if shouldSkipMessage(message, evt.Type, eventJSON) {
+		return
+	}
+
+	// Default UI mapping
+	cardType, priority, data := mapToCard(message)
+
+	// Try to extract node information
+	var nodeInfo struct {
+		Node string `json:"node"`
+		Text string `json:"text"`
+	}
+	incomingNode := ""
+	cleanText := message
+
+	if err := json.Unmarshal([]byte(message), &nodeInfo); err == nil && nodeInfo.Node != "" {
+		incomingNode = nodeInfo.Node
+		cleanText = nodeInfo.Text
+		cardType, priority, data = mapToCard(cleanText)
+		data["source_node"] = incomingNode
+	} else {
+		cleanText = cleanMessage(message)
+		data["summary"] = cleanText
+	}
+
+	// ---------- MAP‑BASED BUCKET LOGIC ----------
+	bucketMutex.Lock()
+	defer bucketMutex.Unlock()
+
+	if incomingNode != "" {
+		if existing, ok := nodeBuckets[incomingNode]; ok {
+			// Append to existing bucket
+			lastSummary, _ := existing.Data["summary"].(string)
+			if len(lastSummary) < 10000 {
+				existing.Data["summary"] = lastSummary + cleanText
+				existing.Timestamp = time.Now().Format(time.RFC3339)
+			}
+			return
+		}
+	}
+
+	// No bucket – create a new FeedItem and store it
+	uniqueID := atomic.AddInt64(&eventCounter, 1)
+	if incomingNode != "" && (data["title"] == "Agent Activity" || data["title"] == "Trip Guardian") {
+		data["title"] = incomingNode
+	}
+	newItem := FeedItem{
+		ID:         fmt.Sprintf("evt-%d-%d", time.Now().UnixNano(), uniqueID),
+		CardType:   cardType,
+		Priority:   priority,
+		Timestamp:  time.Now().Format(time.RFC3339),
+		SourceNode: incomingNode,
+		Data:       data,
+	}
+	if incomingNode != "" {
+		nodeBuckets[incomingNode] = &newItem
+	}
+	// Prepend to feed slice (most recent first)
+	currentFeed = append([]FeedItem{newItem}, currentFeed...)
+}
+// Deprecated duplicate logic removed
 	searchLimit := 50
 	if len(currentFeed) < searchLimit {
 		searchLimit = len(currentFeed)
