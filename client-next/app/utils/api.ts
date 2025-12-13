@@ -5,7 +5,7 @@ const USE_PROXY = typeof window !== 'undefined' && window.location.protocol === 
 
 // Updated IP: 52.204.105.193 (ECS tasks get new IPs on restart - IP changes frequently!)
 // TODO: Use Application Load Balancer or Cloudflare Tunnel for stable endpoint
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://52.204.105.193:8081';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const PROXY_BASE = '/api/proxy';
 
 export const API_ENDPOINTS = {
