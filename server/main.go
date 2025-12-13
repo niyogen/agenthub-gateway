@@ -157,6 +157,29 @@ func processAndAppendFeed(eventJSON string) {
 	// Heuristic Mapping for "Nicer" UI
 	cardType, priority, data := mapToCard(message)
 
+	// CHUNK AGGREGATION LOGIC
+	// If the new item is "Agent Activity" (default/streaming) and matches the last item's type,
+	// we try to append to it instead of creating a new one.
+	if len(currentFeed) > 0 {
+		lastItem := &currentFeed[0]
+
+		// Check if both are generic agent activity or same card type
+		if lastItem.CardType == cardType && lastItem.Data["title"] == data["title"] {
+			// Extract current and new summary/message
+			lastSummary, _ := lastItem.Data["summary"].(string)
+			newSummary, _ := data["summary"].(string)
+
+			// Simple check: are we just streaming text?
+			// If message is short or looks like a chunk, append.
+			// (Limit size to avoid infinite cards)
+			if len(lastSummary) < 5000 {
+				lastItem.Data["summary"] = lastSummary + newSummary
+				lastItem.Timestamp = time.Now().Format(time.RFC3339) // Update time
+				return                                               // UPDATE DONE
+			}
+		}
+	}
+
 	// Generate truly unique ID to avoid collision in fast loops
 	uniqueID := atomic.AddInt64(&eventCounter, 1)
 	newItem := FeedItem{
