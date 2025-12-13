@@ -180,11 +180,13 @@ func processAndAppendFeed(eventJSON string) {
 	}
 
 	// CHUNK AGGREGATION & DEMULTIPLEXING LOGIC
-	// Search in recent items (e.g. last 5) for a card that matches this Node.
-	searchLimit := 5
+	// Search in recent items (e.g. last 50) for a card that matches this Node.
+	searchLimit := 50
 	if len(currentFeed) < searchLimit {
 		searchLimit = len(currentFeed)
 	}
+
+	fmt.Printf("DEBUG: Processing Chunk. Node='%s', TextLen=%d\n", incomingNode, len(cleanText))
 
 	for i := 0; i < searchLimit; i++ {
 		item := &currentFeed[i]
@@ -194,11 +196,13 @@ func processAndAppendFeed(eventJSON string) {
 			// 1. Exact Node Match (Preferred)
 			if item.SourceNode == incomingNode {
 				match = true
+				fmt.Printf("DEBUG: Matched ID '%s' at index %d\n", incomingNode, i)
 			}
 		} else {
 			// 2. Fallback: Generic Match (only for top item)
 			if i == 0 && item.CardType == cardType && item.Data["title"] == data["title"] && item.SourceNode == "" {
 				match = true
+				fmt.Printf("DEBUG: Matched Generic at index 0\n")
 			}
 		}
 
@@ -214,6 +218,8 @@ func processAndAppendFeed(eventJSON string) {
 			}
 		}
 	}
+
+	fmt.Printf("DEBUG: No match found. Creating new item for Node='%s'\n", incomingNode)
 
 	// If no match found, CREATE NEW ITEM
 	uniqueID := atomic.AddInt64(&eventCounter, 1)
