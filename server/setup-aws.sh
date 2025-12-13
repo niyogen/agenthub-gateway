@@ -40,6 +40,20 @@ else
         --region ${AWS_REGION}
 fi
 
+# Google API Key (from environment variable)
+if [ -z "$GOOGLE_API_KEY" ]; then
+  echo "⚠️  Warning: GOOGLE_API_KEY not set. Skipping..."
+else
+  aws secretsmanager create-secret \
+    --name fastgraph-gateway/GOOGLE_API_KEY \
+    --secret-string "${GOOGLE_API_KEY}" \
+    --region ${AWS_REGION} \
+    || aws secretsmanager update-secret \
+        --secret-id fastgraph-gateway/GOOGLE_API_KEY \
+        --secret-string "${GOOGLE_API_KEY}" \
+        --region ${AWS_REGION}
+fi
+
 # Google Maps Key (from environment variable)
 if [ -z "$GOOGLE_MAPS_KEY" ]; then
   echo "⚠️  Warning: GOOGLE_MAPS_KEY not set. Skipping..."
