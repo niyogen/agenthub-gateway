@@ -65,12 +65,16 @@ func (e *Engine) Run(agentPath string, input string, onEvent func(string)) error
 		return e.MockRun(agentPath, input, onEvent)
 	}
 
-	fmt.Printf("CLI: Executing %s run %s\n", e.BinPath, agentPath)
+	fmt.Printf("CLI: Executing %s run %s --stream\n", e.BinPath, agentPath)
 
-	cmd := exec.Command(e.BinPath, "run", agentPath, "--input", input) // #nosec G204
+	cmd := exec.Command(e.BinPath, "run", agentPath, "--input", input, "--stream") // #nosec G204
 
 	// Create Pipes
 	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
 	}
@@ -88,23 +92,50 @@ func (e *Engine) Run(agentPath string, input string, onEvent func(string)) error
 		return err
 	}
 
-	// Stream Output
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Forward CLI output to Frontend
-		fmt.Println("CLI OUT:", line)
+	// WaitGroup for stream readers
+	done := make(chan struct{})
 
-		if onEvent != nil {
-			// Try to determine if line is JSON or Log
-			if len(line) > 0 && line[0] == '{' {
-				onEvent(line)
-			} else {
-				// Wrap Log
-				onEvent(fmt.Sprintf(`{"type": "log", "message": "%s"}`, line))
+	// Stream Stderr (Logs) - Line-based
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Println("CLI LOG:", line)
+			if onEvent != nil {
+				// Wrap as Log event
+				logEvent := map[string]string{"type": "log", "message": line}
+				if jsonBytes, err := json.Marshal(logEvent); err == nil {
+					onEvent(string(jsonBytes))
+				}
 			}
 		}
-	}
+	}()
+
+	// Stream Stdout (Chunks) - Raw Bytes
+	go func() {
+		defer close(done)
+		buf := make([]byte, 1024)
+		for {
+			n, err := stdout.Read(buf)
+			if n > 0 {
+				chunk := string(buf[:n])
+				fmt.Print("CLI CHUNK:", chunk) // Debug
+				if onEvent != nil {
+					// Wrap as Chunk event
+					chunkEvent := map[string]string{"type": "chunk", "message": chunk}
+					if jsonBytes, err := json.Marshal(chunkEvent); err == nil {
+						onEvent(string(jsonBytes))
+					}
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+	}()
+
+	// Wait for Stdout to close (command finished writing output)
+	<-done
 
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("agent execution finished with error: %v", err)

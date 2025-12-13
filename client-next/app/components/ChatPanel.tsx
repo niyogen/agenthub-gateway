@@ -53,55 +53,63 @@ const ChatPanel: React.FC = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ message: userMsg.content }),
+                body: JSON.stringify({ input: userMsg.content }),
             });
 
             if (!response.ok) {
                 throw new Error(response.statusText);
             }
 
+            // Create placeholder text for streaming message
+            const assistantMsgId = Date.now().toString();
+            setMessages(prev => [...prev, {
+                id: assistantMsgId,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date()
+            }]);
+
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
 
             if (!reader) return;
 
+            let buffer = '';
+            let currentText = '';
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = (buffer + chunk).split('\n');
+                // Keep the last partial line in buffer
+                buffer = lines.pop() || '';
 
                 for (const line of lines) {
-                    if (line.startsWith('event: message')) {
-                        // Next line is data
-                        continue;
-                    }
+                    if (line.trim() === '') continue;
+
                     if (line.startsWith('data:')) {
                         const dataContent = line.replace('data:', '').trim();
+                        if (dataContent === '[DONE]') break; // Standard SSE done
+
                         try {
                             const parsed = JSON.parse(dataContent);
-                            // We only want to show the 'message' part of the event if it's meaningful
-                            // But actually, the backend sends the WHOLE event JSON as data.
-                            // Let's filter slightly - or just show raw logs for now to prove connection
-                            // Ideally, we'd accumulate the "final report" here.
 
-                            // For this demo, let's just log it to console and not clutter chat unless it's a specific "chat" type message.
-                            // BUT, the user wants to see "chats".
-                            // FastGraph v0.3.0 doesn't have a specific "chat response" node yet, it just logs.
-                            // So let's extract the "message" field.
+                            // Check for 'text' chunk (New Protocol)
+                            if (parsed.text) {
+                                currentText += parsed.text;
+                                setMessages(prev => prev.map(msg =>
+                                    msg.id === assistantMsgId ? { ...msg, content: currentText } : msg
+                                ));
+                            }
 
-                            if (parsed.message) {
-                                // Optional: If message contains "Report" or "Summary", double post it as assistant message?
-                                // For now, let's just create a temporary 'log' style message or update the feed.
-                                // Actually, the FEED updates automatically. The CHAT should explicitly show the Agent's "Thought process" or Final Answer.
-
-                                // Let's simplify: Just print non-JSON simple updates as assistant messages?
-                                // No, that might be too noisy.
-                                // Let's look for "Trip Guardian Report" or large text blocks.
+                            // Check for 'output' (Done event)
+                            if (parsed.output) {
+                                // Final sync if needed
                             }
                         } catch (e) {
-                            // dataContent might be a raw string if not JSON
+                            // verify if explicit [DONE] was embedded or ignoring parse error
                         }
                     }
                 }
@@ -157,8 +165,8 @@ const ChatPanel: React.FC = () => {
                     >
                         <div
                             className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${msg.role === 'user'
-                                    ? 'bg-blue-600 text-white rounded-br-none'
-                                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                                ? 'bg-blue-600 text-white rounded-br-none'
+                                : 'bg-gray-100 text-gray-800 rounded-bl-none'
                                 }`}
                         >
                             <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
